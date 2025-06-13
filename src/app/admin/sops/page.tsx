@@ -346,7 +346,7 @@ export default function SOPsPage() {
                       <div className="text-center py-8 border-2 border-dashed rounded-lg">
                         <IconListDetails className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                         <p className="text-muted-foreground">No steps added yet</p>
-                        <p className="text-sm text-muted-foreground">Click "Add Step" to create workflow steps</p>
+                        <p className="text-sm text-muted-foreground">Click &quot;Add Step&quot; to create workflow steps</p>
                       </div>
                     )}
                   </div>

@@ -126,7 +126,7 @@ export default function TasksConfigurationPage() {
 
       // Get existing categories from localStorage
       const storedCategories = localStorage.getItem('taskCategories')
-      let categories = storedCategories ? JSON.parse(storedCategories) : []
+      const categories = storedCategories ? JSON.parse(storedCategories) : []
 
       if (editingCategory) {
         // Update existing category
@@ -176,7 +176,7 @@ export default function TasksConfigurationPage() {
     try {
       // Get existing categories from localStorage
       const storedCategories = localStorage.getItem('taskCategories')
-      let categories = storedCategories ? JSON.parse(storedCategories) : []
+      const categories = storedCategories ? JSON.parse(storedCategories) : []
 
       // Remove the category
       categories = categories.filter((cat: Category) => cat.id !== category.id)

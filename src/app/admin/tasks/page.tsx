@@ -21,7 +21,7 @@ export default function AdminTasksPage() {
   const [showForm, setShowForm] = useState(false)
   const [tasks, setTasks] = useState<TaskWithSLA[]>([])
   const [loadingTasks, setLoadingTasks] = useState(true)
-  const [staff, setStaff] = useState<any[]>([])
+  const [staff, setStaff] = useState<Array<{id: string; name: string; role: string}>>([])  
   const [loadingStaff, setLoadingStaff] = useState(true)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -116,12 +116,12 @@ export default function AdminTasksPage() {
       // Get categories from localStorage (set by configuration page)
       const storedCategories = localStorage.getItem('taskCategories')
       if (storedCategories) {
-        const data = JSON.parse(storedCategories)
-        setGrievanceTypes(data.map((cat: any) => ({ value: cat.value, label: cat.label })))
+        const data: Array<{value: string; label: string; subcategories?: string[]}> = JSON.parse(storedCategories)
+        setGrievanceTypes(data.map((cat) => ({ value: cat.value, label: cat.label })))
         
         // Build subcategories mapping
         const subCatMapping: Record<string, string[]> = {}
-        data.forEach((cat: any) => {
+        data.forEach((cat) => {
           subCatMapping[cat.value] = cat.subcategories || []
         })
         setSubCategories(subCatMapping)
@@ -191,7 +191,7 @@ export default function AdminTasksPage() {
     if (!editingField) return
     
     const { taskId, field } = editingField
-    let value: any = tempValue
+    let value: string | number = tempValue
     
     // Convert 'unassigned' to undefined for the assigned_to field
     if (field === 'assigned_to' && value === 'unassigned') {
@@ -1049,7 +1049,7 @@ function EditTaskForm({
   task: Task
   onUpdate: (taskId: number, updates: Partial<Task>) => Promise<void>
   onClose: () => void
-  staff?: any[]
+  staff?: Array<{id: string; name: string; role: string}>
   grievanceTypes?: { value: string; label: string }[]
   subCategories?: Record<string, string[]>
 }) {

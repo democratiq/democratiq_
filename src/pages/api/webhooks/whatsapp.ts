@@ -76,7 +76,7 @@ export default async function handler(
 async function processWhatsAppMessage(message: WhatsAppMessage) {
   try {
     let description = ''
-    let attachments: string[] = []
+    const attachments: string[] = []
 
     switch (message.type) {
       case 'text':
