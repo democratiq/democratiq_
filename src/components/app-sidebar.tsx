@@ -17,6 +17,9 @@ import {
   IconSettings,
   IconUsers,
   IconRobot,
+  IconChartPie,
+  IconAdjustments,
+  IconMessageReport,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -42,28 +45,51 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
       title: "Tasks",
-      url: "/tasks",
+      url: "/admin/tasks",
       icon: IconListDetails,
+      items: [
+        {
+          title: "Tasks",
+          url: "/admin/tasks",
+        },
+        {
+          title: "Analytics",
+          url: "/admin/tasks/analytics",
+        },
+        {
+          title: "Configuration",
+          url: "/admin/tasks/configuration",
+        },
+        {
+          title: "Complaint Source",
+          url: "/admin/tasks/complaint-source",
+        },
+      ],
     },
     {
-      title: "Analytics",
-      url: "#",
+      title: "Staff",
+      url: "/admin/staff",
+      icon: IconUsers,
+    },
+    {
+      title: "QR Generator",
+      url: "/admin/qr-generator",
+      icon: IconCamera,
+    },
+    {
+      title: "Leaderboard",
+      url: "/admin/leaderboard",
       icon: IconChartBar,
     },
     {
-      title: "Campaigns",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
+      title: "SOPs",
+      url: "/admin/sops",
+      icon: IconFileDescription,
     },
   ],
   navClouds: [
@@ -133,9 +159,9 @@ const data = {
   ],
   documents: [
     {
-      name: "Voters",
-      url: "#",
-      icon: IconDatabase,
+      name: "Admin Guide",
+      url: "/admin/guide",
+      icon: IconHelp,
     },
     {
       name: "Reports",
@@ -174,7 +200,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   )
