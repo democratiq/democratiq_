@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { IconLoader, IconMapPin, IconPhone, IconUser, IconMessageCircle } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
-export default function TaskFormPage() {
+function TaskFormComponent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -208,5 +208,15 @@ export default function TaskFormPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function TaskFormPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center">
+      <IconLoader className="h-6 w-6 animate-spin" />
+    </div>}>
+      <TaskFormComponent />
+    </Suspense>
   )
 }
