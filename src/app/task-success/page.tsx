@@ -1,12 +1,13 @@
 "use client"
 
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { IconCheck, IconCopy, IconExternalLink } from '@tabler/icons-react'
+import { IconCheck, IconCopy, IconExternalLink, IconLoader } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
-export default function GrievanceSuccessPage() {
+function TaskSuccessComponent() {
   const searchParams = useSearchParams()
   const taskId = searchParams.get('id')
   const shortId = taskId?.slice(-6) || 'XXXXXX'
@@ -83,5 +84,17 @@ export default function GrievanceSuccessPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function GrievanceSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <IconLoader className="h-6 w-6 animate-spin" />
+      </div>
+    }>
+      <TaskSuccessComponent />
+    </Suspense>
   )
 }
