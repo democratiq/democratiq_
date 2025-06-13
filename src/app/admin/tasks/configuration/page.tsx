@@ -5,6 +5,7 @@ import { AuthGuard } from '@/components/auth-guard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,25 @@ interface Category {
   created_at: string
 }
 
+interface WorkflowStep {
+  id: string
+  title: string
+  description: string
+  duration: number
+  required: boolean
+}
+
+interface Workflow {
+  id: string
+  category: string
+  subcategory: string
+  sla_days: number
+  sla_hours: number
+  warning_threshold: number
+  steps: WorkflowStep[]
+  created_at: string
+}
+
 export default function TasksConfigurationPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +51,27 @@ export default function TasksConfigurationPage() {
     label: '',
     subcategories: ''
   })
+
+  // Workflow states
+  const [workflows, setWorkflows] = useState<Workflow[]>([])
+  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false)
+  const [workflowFormData, setWorkflowFormData] = useState({
+    category: '',
+    subcategory: '',
+    sla_days: '',
+    sla_hours: '',
+    warning_threshold: '80'
+  })
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([
+    {
+      id: '1',
+      title: '',
+      description: '',
+      duration: 0,
+      required: true
+    }
+  ])
+  const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([])
 
   // Load categories on mount
   useEffect(() => {
@@ -126,7 +167,7 @@ export default function TasksConfigurationPage() {
 
       // Get existing categories from localStorage
       const storedCategories = localStorage.getItem('taskCategories')
-      const categories = storedCategories ? JSON.parse(storedCategories) : []
+      let categories = storedCategories ? JSON.parse(storedCategories) : []
 
       if (editingCategory) {
         // Update existing category
@@ -176,7 +217,7 @@ export default function TasksConfigurationPage() {
     try {
       // Get existing categories from localStorage
       const storedCategories = localStorage.getItem('taskCategories')
-      const categories = storedCategories ? JSON.parse(storedCategories) : []
+      let categories = storedCategories ? JSON.parse(storedCategories) : []
 
       // Remove the category
       categories = categories.filter((cat: Category) => cat.id !== category.id)
@@ -207,6 +248,111 @@ export default function TasksConfigurationPage() {
       resetForm()
     }
   }
+
+  // Workflow functions
+  const handleCategoryChange = (categoryValue: string) => {
+    setWorkflowFormData(prev => ({ ...prev, category: categoryValue, subcategory: '' }))
+    const selectedCategory = categories.find(cat => cat.value === categoryValue)
+    setAvailableSubcategories(selectedCategory?.subcategories || [])
+  }
+
+  const addWorkflowStep = () => {
+    const newStep: WorkflowStep = {
+      id: String(workflowSteps.length + 1),
+      title: '',
+      description: '',
+      duration: 0,
+      required: true
+    }
+    setWorkflowSteps([...workflowSteps, newStep])
+  }
+
+  const removeWorkflowStep = (stepId: string) => {
+    if (workflowSteps.length > 1) {
+      setWorkflowSteps(workflowSteps.filter(step => step.id !== stepId))
+    }
+  }
+
+  const updateWorkflowStep = (stepId: string, field: keyof WorkflowStep, value: any) => {
+    setWorkflowSteps(workflowSteps.map(step => 
+      step.id === stepId ? { ...step, [field]: value } : step
+    ))
+  }
+
+  const handleWorkflowSubmit = async () => {
+    try {
+      if (!workflowFormData.category || !workflowFormData.sla_days) {
+        toast.error('Please fill in category and SLA days')
+        return
+      }
+
+      if (workflowSteps.some(step => !step.title)) {
+        toast.error('Please fill in all step titles')
+        return
+      }
+
+      const newWorkflow: Workflow = {
+        id: Date.now().toString(),
+        category: workflowFormData.category,
+        subcategory: workflowFormData.subcategory || 'all',
+        sla_days: parseInt(workflowFormData.sla_days),
+        sla_hours: parseInt(workflowFormData.sla_hours) || 0,
+        warning_threshold: parseInt(workflowFormData.warning_threshold),
+        steps: workflowSteps,
+        created_at: new Date().toISOString()
+      }
+
+      // Save to localStorage for demo
+      const storedWorkflows = localStorage.getItem('taskWorkflows')
+      const existingWorkflows = storedWorkflows ? JSON.parse(storedWorkflows) : []
+      existingWorkflows.push(newWorkflow)
+      localStorage.setItem('taskWorkflows', JSON.stringify(existingWorkflows))
+
+      setWorkflows(existingWorkflows)
+      setWorkflowDialogOpen(false)
+      resetWorkflowForm()
+      toast.success('Workflow created successfully')
+    } catch (error) {
+      console.error('Error creating workflow:', error)
+      toast.error('Failed to create workflow')
+    }
+  }
+
+  const resetWorkflowForm = () => {
+    setWorkflowFormData({
+      category: '',
+      subcategory: '',
+      sla_days: '',
+      sla_hours: '',
+      warning_threshold: '80'
+    })
+    setWorkflowSteps([
+      {
+        id: '1',
+        title: '',
+        description: '',
+        duration: 0,
+        required: true
+      }
+    ])
+    setAvailableSubcategories([])
+  }
+
+  const loadWorkflows = () => {
+    try {
+      const storedWorkflows = localStorage.getItem('taskWorkflows')
+      if (storedWorkflows) {
+        setWorkflows(JSON.parse(storedWorkflows))
+      }
+    } catch (error) {
+      console.error('Error loading workflows:', error)
+    }
+  }
+
+  // Load workflows on mount
+  useEffect(() => {
+    loadWorkflows()
+  }, [])
 
   return (
     <AuthGuard>
@@ -385,6 +531,263 @@ export default function TasksConfigurationPage() {
 
           <Card>
             <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconList className="h-5 w-5" />
+                    Workflow Configuration
+                  </CardTitle>
+                  <CardDescription>
+                    Define workflow steps for category and subcategory combinations with SLA timelines
+                  </CardDescription>
+                </div>
+                <Dialog open={workflowDialogOpen} onOpenChange={setWorkflowDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <IconPlus className="h-4 w-4" />
+                      Add Workflow
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Create Workflow</DialogTitle>
+                      <DialogDescription>
+                        Define the steps required to complete tasks for specific category/subcategory combinations
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6">
+                      {/* Category/Subcategory Selection */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="workflow-category">Category *</Label>
+                          <Select value={workflowFormData.category} onValueChange={handleCategoryChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category.value} value={category.value}>
+                                  {category.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="workflow-subcategory">Subcategory</Label>
+                          <Select 
+                            value={workflowFormData.subcategory} 
+                            onValueChange={(value) => setWorkflowFormData(prev => ({ ...prev, subcategory: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select subcategory" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Subcategories</SelectItem>
+                              {availableSubcategories.map((subcat) => (
+                                <SelectItem key={subcat} value={subcat}>
+                                  {subcat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* SLA Configuration */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">SLA Configuration</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="workflow-sla-days">SLA Days *</Label>
+                            <Input 
+                              id="workflow-sla-days" 
+                              type="number" 
+                              placeholder="e.g., 7" 
+                              value={workflowFormData.sla_days}
+                              onChange={(e) => setWorkflowFormData(prev => ({ ...prev, sla_days: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="workflow-sla-hours">SLA Hours</Label>
+                            <Input 
+                              id="workflow-sla-hours" 
+                              type="number" 
+                              placeholder="e.g., 8" 
+                              value={workflowFormData.sla_hours}
+                              onChange={(e) => setWorkflowFormData(prev => ({ ...prev, sla_hours: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="workflow-warning-threshold">Warning Threshold (%)</Label>
+                            <Input 
+                              id="workflow-warning-threshold" 
+                              type="number" 
+                              placeholder="e.g., 80" 
+                              value={workflowFormData.warning_threshold}
+                              onChange={(e) => setWorkflowFormData(prev => ({ ...prev, warning_threshold: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Workflow Steps */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium">Workflow Steps</h3>
+                          <Button type="button" variant="outline" size="sm" onClick={addWorkflowStep}>
+                            <IconPlus className="h-4 w-4 mr-2" />
+                            Add Step
+                          </Button>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {workflowSteps.map((step, index) => (
+                            <div key={step.id} className="border rounded-lg p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium">Step {index + 1}</Label>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => removeWorkflowStep(step.id)}
+                                  disabled={workflowSteps.length === 1}
+                                >
+                                  <IconTrash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor={`step-title-${step.id}`}>Step Title *</Label>
+                                  <Input 
+                                    id={`step-title-${step.id}`} 
+                                    placeholder="e.g., Initial Assessment" 
+                                    value={step.title}
+                                    onChange={(e) => updateWorkflowStep(step.id, 'title', e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`step-duration-${step.id}`}>Expected Duration (hours)</Label>
+                                  <Input 
+                                    id={`step-duration-${step.id}`} 
+                                    type="number" 
+                                    placeholder="e.g., 2" 
+                                    value={step.duration}
+                                    onChange={(e) => updateWorkflowStep(step.id, 'duration', parseInt(e.target.value) || 0)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`step-description-${step.id}`}>Step Description</Label>
+                                <Textarea 
+                                  id={`step-description-${step.id}`} 
+                                  placeholder="Describe what needs to be done in this step..." 
+                                  rows={2} 
+                                  value={step.description}
+                                  onChange={(e) => updateWorkflowStep(step.id, 'description', e.target.value)}
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch 
+                                  id={`step-required-${step.id}`} 
+                                  checked={step.required}
+                                  onCheckedChange={(checked) => updateWorkflowStep(step.id, 'required', checked)}
+                                />
+                                <Label htmlFor={`step-required-${step.id}`} className="text-sm">Required step (must be completed to close task)</Label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-4 border-t">
+                        <Button className="flex-1" onClick={handleWorkflowSubmit}>Create Workflow</Button>
+                        <Button type="button" variant="outline" onClick={() => setWorkflowDialogOpen(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {workflows.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <IconList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-2">No workflows configured yet</p>
+                    <p className="text-sm text-muted-foreground">Create workflows to define step-by-step processes for completing tasks</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Subcategory</TableHead>
+                        <TableHead>Steps</TableHead>
+                        <TableHead>SLA</TableHead>
+                        <TableHead>Warning</TableHead>
+                        <TableHead className="w-20">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workflows.map((workflow) => (
+                        <TableRow key={workflow.id}>
+                          <TableCell className="font-medium">
+                            {categories.find(cat => cat.value === workflow.category)?.label || workflow.category}
+                          </TableCell>
+                          <TableCell>
+                            {workflow.subcategory === 'all' ? 'All' : workflow.subcategory}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {workflow.steps.slice(0, 2).map((step, index) => (
+                                <span key={index} className="text-xs bg-muted px-2 py-1 rounded">
+                                  {step.title}
+                                </span>
+                              ))}
+                              {workflow.steps.length > 2 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{workflow.steps.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {workflow.sla_days}d {workflow.sla_hours > 0 && `${workflow.sla_hours}h`}
+                          </TableCell>
+                          <TableCell>
+                            {workflow.warning_threshold}%
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                              >
+                                <IconEdit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>SLA Settings</CardTitle>
               <CardDescription>
                 Configure Service Level Agreement timelines for different priority levels
@@ -410,38 +813,6 @@ export default function TasksConfigurationPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>
-                Configure how and when notifications are sent
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Email Notifications</Label>
-                  <p className="text-sm text-muted-foreground">Send email alerts for new tasks</p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>SLA Warnings</Label>
-                  <p className="text-sm text-muted-foreground">Alert when tasks are approaching SLA deadline</p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Daily Summary</Label>
-                  <p className="text-sm text-muted-foreground">Send daily task summary to supervisors</p>
-                </div>
-                <Switch />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Auto-Assignment Rules</CardTitle>
               <CardDescription>
                 Configure automatic task assignment based on categories
@@ -461,6 +832,83 @@ export default function TasksConfigurationPage() {
                     <SelectItem value="category-based">Category Based</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Push Notifications</CardTitle>
+              <CardDescription>
+                Configure push notification settings for real-time updates
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enable Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Send push notifications to web browsers</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Task Assignment Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Notify agents when tasks are assigned to them</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Status Update Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Notify when task status changes</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>SLA Warning Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Alert when tasks are approaching SLA deadline</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>New Task Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Notify supervisors of new task submissions</p>
+                </div>
+                <Switch />
+              </div>
+              <div className="space-y-2">
+                <Label>Notification Frequency</Label>
+                <Select defaultValue="immediate">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="immediate">Immediate</SelectItem>
+                    <SelectItem value="every-5-min">Every 5 minutes</SelectItem>
+                    <SelectItem value="every-15-min">Every 15 minutes</SelectItem>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="daily">Daily digest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Quiet Hours</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quiet-start">Start Time</Label>
+                    <Input id="quiet-start" type="time" defaultValue="22:00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quiet-end">End Time</Label>
+                    <Input id="quiet-end" type="time" defaultValue="08:00" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  No notifications will be sent during quiet hours except for high priority tasks
+                </p>
               </div>
             </CardContent>
           </Card>
