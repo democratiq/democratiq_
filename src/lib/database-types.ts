@@ -79,3 +79,48 @@ export interface TrainingModule {
   is_active: boolean
   created_at: string
 }
+
+export interface Politician {
+  id: string
+  name: string
+  email: string
+  phone: string
+  party?: string
+  constituency?: string
+  position?: string
+  state?: string
+  district?: string
+  profile_image?: string
+  bio?: string
+  social_media?: {
+    twitter?: string
+    facebook?: string
+    instagram?: string
+    linkedin?: string
+  }
+  settings?: {
+    task_auto_assign?: boolean
+    email_notifications?: boolean
+    sms_notifications?: boolean
+    whatsapp_notifications?: boolean
+  }
+  subscription_tier?: 'basic' | 'pro' | 'enterprise'
+  subscription_expires_at?: string
+  is_active: boolean
+  created_at: string
+  created_by: string
+  updated_at: string
+}
+
+export interface UserProfile {
+  id: string
+  email: string
+  role: 'super_admin' | 'admin' | 'staff'
+  politician_id?: string
+  name?: string
+  phone?: string
+  permissions?: string[]
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}

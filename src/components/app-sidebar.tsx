@@ -20,6 +20,7 @@ import {
   IconChartPie,
   IconAdjustments,
   IconMessageReport,
+  IconBuilding,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -49,6 +50,21 @@ const data = {
       icon: IconDashboard,
     },
     {
+      title: "Clients",
+      url: "/admin/clients",
+      icon: IconBuilding,
+      items: [
+        {
+          title: "All Clients",
+          url: "/admin/clients",
+        },
+        {
+          title: "Onboard Client",
+          url: "/admin/clients/onboard",
+        },
+      ],
+    },
+    {
       title: "Tasks",
       url: "/admin/tasks",
       icon: IconListDetails,
@@ -75,21 +91,6 @@ const data = {
       title: "Staff",
       url: "/admin/staff",
       icon: IconUsers,
-    },
-    {
-      title: "QR Generator",
-      url: "/admin/qr-generator",
-      icon: IconCamera,
-    },
-    {
-      title: "Leaderboard",
-      url: "/admin/leaderboard",
-      icon: IconChartBar,
-    },
-    {
-      title: "SOPs",
-      url: "/admin/sops",
-      icon: IconFileDescription,
     },
   ],
   navClouds: [
@@ -147,8 +148,8 @@ const data = {
       icon: IconSettings,
     },
     {
-      title: "Get Help",
-      url: "#",
+      title: "Auth Debug",
+      url: "/admin/debug-auth",
       icon: IconHelp,
     },
     {

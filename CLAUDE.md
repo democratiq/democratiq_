@@ -62,6 +62,22 @@ The system supports external task creation via webhook at `/api/webhooks/tasks/c
 - **Authentication**: `X-API-Key` header
 - **Environment Variable**: `WEBHOOK_API_KEY=your-secret-key`
 
+## Environment Variables
+Add these to your `.env.local`:
+```bash
+# Existing variables
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+# Webhook API
+WEBHOOK_API_KEY=your-webhook-api-key
+
+# Super Admin API (for server-to-server calls)
+SUPER_ADMIN_API_KEY=your-super-admin-api-key
+```
+
 See `WEBHOOK_API.md` for complete documentation and examples.
 
 ## Testing Tools
@@ -74,6 +90,41 @@ See `WEBHOOK_API.md` for complete documentation and examples.
 - `npm run build` - Build for production  
 - `npm run lint` - Run linting
 - `npm run typecheck` - TypeScript type checking
+
+## Client Onboarding System
+
+### Overview
+Multi-tenant system where super admins can onboard politicians, each with their own isolated data and user access.
+
+### Key Features
+- **Super Admin Only Access**: Only users with `super_admin` role can access client management
+- **Complete Data Isolation**: Each politician's data is completely separate
+- **Subscription Management**: Basic, Pro, and Enterprise tiers
+- **Auto-provisioning**: Creates admin user, categories, and counters automatically
+
+### Database Schema
+- `politicians` - Stores politician profiles and settings
+- `user_profiles` - Links auth users to roles and politicians
+- `task_counters` - Analytics counters per politician
+- All existing tables now include `politician_id` for data isolation
+
+### Required Migrations
+1. **task_workflow_steps table**: Run `task_workflow_steps_migration.sql`
+2. **source column**: Run `add_source_column_migration.sql` 
+3. **politician onboarding**: Run `politician_onboarding_migration.sql` (includes RLS policies)
+
+### Setting Up Super Admin
+After running migrations, create a super admin user:
+```sql
+INSERT INTO user_profiles (id, email, name, role, is_active)
+VALUES (
+  'YOUR-AUTH-USER-ID',  -- Get from Supabase Auth
+  'your-email@example.com',
+  'Your Name',
+  'super_admin',
+  true
+);
+```
 
 ## Known Issues
 - Workflow attachment during task creation needs verification after category changes
