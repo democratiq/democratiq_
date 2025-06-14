@@ -12,12 +12,16 @@ export interface Task {
   is_deleted: boolean
   ai_summary?: string
   created_at: string
+  workflow_id?: string
+  source?: 'voice_bot' | 'whatsapp' | 'manual_entry' | 'qr_code' | 'email'
 }
 
 export interface TaskWithSLA extends Task {
   sla_status: 'within_sla' | 'approaching_sla' | 'overdue'
   days_remaining?: number
   hours_remaining?: number
+  totalSteps?: number
+  completedSteps?: number
 }
 
 export interface Staff {

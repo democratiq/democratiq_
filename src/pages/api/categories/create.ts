@@ -1,4 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function handler(
   req: NextApiRequest,
@@ -29,19 +35,28 @@ export default async function handler(
       })
     }
 
-    // Create new category object
-    const newCategory = {
-      id: value, // Use value as ID for simplicity
-      value,
-      label,
-      subcategories: subcategories || [],
-      created_at: new Date().toISOString()
+    // Insert into Supabase
+    const { data: newCategory, error } = await supabase
+      .from('categories')
+      .insert({
+        value,
+        label,
+        subcategories: subcategories || []
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating category:', error)
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({
+          error: 'A category with this value already exists'
+        })
+      }
+      return res.status(500).json({ error: 'Failed to create category' })
     }
 
-    // In a real application, you would save this to a database
-    // For now, we'll just return the created category
     console.log('Creating category:', newCategory)
-
     res.status(201).json(newCategory)
 
   } catch (error) {

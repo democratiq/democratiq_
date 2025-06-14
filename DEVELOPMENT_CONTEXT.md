@@ -15,7 +15,7 @@
   - Tasks → Main tasks table screen
   - Analytics → Task analytics dashboard
   - Configuration → Category management
-  - Complaint Source → Source tracking
+  - Task Source → Source tracking
 
 #### Database Schema
 - **Tasks Table** with columns:
@@ -235,7 +235,7 @@ Admin Dashboard
 │   ├── Tasks → /admin/tasks (main table)
 │   ├── Analytics → /admin/tasks/analytics
 │   ├── Configuration → /admin/tasks/configuration
-│   └── Complaint Source → /admin/tasks/source
+│   └── Task Source → /admin/tasks/source
 ├── Staff Management
 ├── SOPs
 └── Settings

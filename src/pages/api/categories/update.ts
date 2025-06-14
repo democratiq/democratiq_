@@ -1,4 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function handler(
   req: NextApiRequest,
@@ -34,18 +40,33 @@ export default async function handler(
       })
     }
 
-    // Create updated category object
-    const updatedCategory = {
-      id: id as string,
-      value,
-      label,
-      subcategories: subcategories || [],
-      created_at: new Date().toISOString() // In real app, preserve original created_at
+    // Update in Supabase
+    const { data: updatedCategory, error } = await supabase
+      .from('categories')
+      .update({
+        value,
+        label,
+        subcategories: subcategories || []
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating category:', error)
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({
+          error: 'A category with this value already exists'
+        })
+      }
+      return res.status(500).json({ error: 'Failed to update category' })
     }
 
-    // In a real application, you would update this in a database
-    console.log('Updating category:', id, updatedCategory)
+    if (!updatedCategory) {
+      return res.status(404).json({ error: 'Category not found' })
+    }
 
+    console.log('Updated category:', updatedCategory)
     res.status(200).json(updatedCategory)
 
   } catch (error) {

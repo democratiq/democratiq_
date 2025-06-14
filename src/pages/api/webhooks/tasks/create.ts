@@ -1,25 +1,57 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 
-console.log('=== TASK CREATE API FILE LOADED ===')
+// Webhook authentication middleware
+function authenticateWebhook(req: NextApiRequest): { isValid: boolean; error?: string } {
+  const apiKey = req.headers['x-api-key'] as string
+  
+  if (!apiKey) {
+    return { isValid: false, error: 'Missing X-API-Key header' }
+  }
+  
+  const validApiKey = process.env.WEBHOOK_API_KEY
+  if (!validApiKey) {
+    return { isValid: false, error: 'Webhook API key not configured on server' }
+  }
+  
+  if (apiKey !== validApiKey) {
+    return { isValid: false, error: 'Invalid API key' }
+  }
+  
+  return { isValid: true }
+}
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  console.log('=== TASK CREATE API CALLED ===')
+  console.log('=== WEBHOOK TASK CREATE API CALLED ===')
   console.log('Method:', req.method)
-  console.log('Body:', JSON.stringify(req.body, null, 2))
+  console.log('Headers:', {
+    'x-api-key': req.headers['x-api-key'] ? '[REDACTED]' : 'none',
+    'content-type': req.headers['content-type'],
+    'user-agent': req.headers['user-agent']
+  })
   
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', ['POST'])
-      res.status(405).end(`Method ${req.method} Not Allowed`)
+      res.status(405).json({ error: `Method ${req.method} Not Allowed` })
       return
     }
 
-    console.log('Importing taskService...')
-    const { taskService } = await import('../../../lib/supabase-admin')
-    console.log('taskService imported successfully')
+    // Authenticate webhook
+    const authResult = authenticateWebhook(req)
+    if (!authResult.isValid) {
+      console.log('Authentication failed:', authResult.error)
+      res.status(401).json({ 
+        error: 'Unauthorized', 
+        message: authResult.error,
+        timestamp: new Date().toISOString()
+      })
+      return
+    }
+
+    console.log('Webhook authenticated successfully')
 
     const {
       title,
@@ -31,10 +63,14 @@ export default async function handler(
       sub_category,
       assigned_to,
       deadline,
-      source = 'manual_entry'
+      // Additional webhook-specific fields
+      source,
+      webhook_source,
+      external_id,
+      webhook_metadata
     } = req.body
 
-    console.log('Extracted data:', {
+    console.log('Extracted webhook data:', {
       title,
       description,
       status,
@@ -44,16 +80,26 @@ export default async function handler(
       sub_category,
       assigned_to,
       deadline,
-      source
+      source,
+      webhook_source,
+      external_id
     })
 
     // Validate required fields
     if (!title || !description || !grievance_type || !voter_name) {
       console.log('Validation failed - missing required fields')
       return res.status(400).json({
-        error: 'Missing required fields: title, description, grievance_type, voter_name'
+        error: 'Missing required fields',
+        required: ['title', 'description', 'grievance_type', 'voter_name'],
+        provided: Object.keys(req.body),
+        timestamp: new Date().toISOString()
       })
     }
+
+    // Import task service
+    console.log('Importing taskService...')
+    const { taskService } = await import('../../../../lib/supabase-admin')
+    console.log('taskService imported successfully')
 
     // Calculate default deadline if not provided
     let taskDeadline = deadline
@@ -64,9 +110,9 @@ export default async function handler(
       taskDeadline = deadlineDate.toISOString()
     }
 
-    // Create the task data
+    // Create the task data with webhook metadata
     const taskData = {
-      title,
+      title: webhook_source ? `[${webhook_source}] ${title}` : title,
       category: grievance_type,
       sub_category: sub_category && sub_category !== 'none' ? sub_category : null,
       status,
@@ -77,7 +123,15 @@ export default async function handler(
       deadline: taskDeadline,
       is_deleted: false,
       ai_summary: description,
-      source
+      source: source || 'email', // Default to email for webhook unless specified
+      // Store webhook metadata in ai_summary or create separate field
+      ...(webhook_metadata && {
+        ai_summary: `${description}\n\nWebhook Metadata: ${JSON.stringify(webhook_metadata)}`
+      }),
+      ...(external_id && {
+        // If you have an external_id field in your tasks table, uncomment this:
+        // external_id: external_id
+      })
     }
 
     console.log('Task data prepared:', taskData)
@@ -85,9 +139,9 @@ export default async function handler(
     
     const task = await taskService.create(taskData)
     
-    console.log('Task created successfully:', task)
+    console.log('Task created successfully via webhook:', task)
     
-    // Check if there's a workflow for this category/subcategory combination
+    // Workflow attachment logic (same as original API)
     console.log('Checking for workflow...')
     const { createClient } = await import('@supabase/supabase-js')
     const supabase = createClient(
@@ -164,7 +218,6 @@ export default async function handler(
       
       if (workflow && workflow.steps && workflow.steps.length > 0) {
         console.log('Found workflow with steps:', workflow.steps.length)
-        console.log('Workflow steps:', JSON.stringify(workflow.steps, null, 2))
         
         // Update task with workflow_id
         const { error: updateError } = await supabase
@@ -190,7 +243,7 @@ export default async function handler(
           status: 'pending'
         }))
         
-        console.log('Inserting task workflow steps:', JSON.stringify(taskSteps, null, 2))
+        console.log('Inserting task workflow steps:', taskSteps.length, 'steps')
         
         const { error: stepsError } = await supabase
           .from('task_workflow_steps')
@@ -208,17 +261,36 @@ export default async function handler(
       console.log('Category not found in database')
     }
     
-    res.status(201).json(task)
+    // Return success response with task details
+    res.status(201).json({
+      success: true,
+      message: 'Task created successfully via webhook',
+      task: {
+        id: task.id,
+        title: task.title,
+        category: task.category,
+        sub_category: task.sub_category,
+        status: task.status,
+        priority: task.priority,
+        filled_by: task.filled_by,
+        assigned_to: task.assigned_to,
+        deadline: task.deadline,
+        created_at: task.created_at
+      },
+      workflow_attached: !!category,
+      timestamp: new Date().toISOString()
+    })
 
   } catch (error) {
-    console.error('=== TASK CREATE ERROR ===')
+    console.error('=== WEBHOOK TASK CREATE ERROR ===')
     console.error('Error type:', typeof error)
     console.error('Error:', error)
-    console.error('Error stringified:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
     
     res.status(500).json({
+      success: false,
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      message: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
     })
   }
 }

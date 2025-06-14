@@ -22,17 +22,7 @@ function TaskFormComponent() {
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high'
   })
-
-  // Set initial values after hydration to avoid SSR mismatch
-  useEffect(() => {
-    const category = searchParams.get('category')?.trim()
-    // Ensure the category is valid before setting it
-    if (category && category !== '' && grievanceTypes.some(type => type.value === category)) {
-      setFormData(prev => ({ ...prev, grievance_type: category }))
-    }
-  }, [searchParams])
-
-  const grievanceTypes = [
+  const [grievanceTypes, setGrievanceTypes] = useState([
     { value: 'general', label: 'General Complaint' },
     { value: 'water', label: 'Water Supply' },
     { value: 'electricity', label: 'Electricity' },
@@ -43,7 +33,45 @@ function TaskFormComponent() {
     { value: 'safety', label: 'Safety & Security' },
     { value: 'corruption', label: 'Corruption' },
     { value: 'other', label: 'Other' }
-  ].filter(type => type.value && type.value.trim() !== '') // Filter out any empty values
+  ])
+
+  // Fetch categories from database
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories/list')
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+      
+      const data: Array<{value: string; label: string}> = await response.json()
+      
+      if (data && data.length > 0) {
+        setGrievanceTypes(data.map((cat) => ({ value: cat.value, label: cat.label })))
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+      // Keep default categories if API fails
+    }
+  }
+
+  // Set initial values after hydration to avoid SSR mismatch
+  useEffect(() => {
+    fetchCategories()
+    
+    const category = searchParams.get('category')?.trim()
+    // Ensure the category is valid before setting it
+    if (category && category !== '' && grievanceTypes.some(type => type.value === category)) {
+      setFormData(prev => ({ ...prev, grievance_type: category }))
+    }
+  }, [searchParams])
+
+  // Update form data when categories load and URL has category param
+  useEffect(() => {
+    const category = searchParams.get('category')?.trim()
+    if (category && category !== '' && grievanceTypes.some(type => type.value === category)) {
+      setFormData(prev => ({ ...prev, grievance_type: category }))
+    }
+  }, [grievanceTypes, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

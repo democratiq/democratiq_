@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/auth-guard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,12 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { IconPlus, IconLoader, IconUser, IconPhone, IconMapPin, IconTag, IconCalendar, IconClock, IconEdit, IconCheck, IconX, IconSearch, IconFilter, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import { IconPlus, IconLoader, IconUser, IconPhone, IconMapPin, IconTag, IconCalendar, IconClock, IconEdit, IconCheck, IconX, IconSearch, IconFilter, IconChevronLeft, IconChevronRight, IconChecklist, IconCircleCheck, IconCircle, IconNotes } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Task, TaskWithSLA } from '@/lib/database-types'
 import { calculateSLAStatus, getSLABadgeVariant, getSLAText } from '@/lib/sla-utils'
+import { getSourceIcon, getSourceLabel, sourceConfig } from '@/lib/source-utils'
 
 export default function AdminTasksPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [tasks, setTasks] = useState<TaskWithSLA[]>([])
@@ -47,7 +50,8 @@ export default function AdminTasksPage() {
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     assigned_to: 'unassigned',
-    deadline: ''
+    deadline: '',
+    source: 'manual_entry' as 'voice_bot' | 'whatsapp' | 'manual_entry' | 'qr_code' | 'email'
   })
 
   const [grievanceTypes, setGrievanceTypes] = useState([
@@ -79,12 +83,29 @@ export default function AdminTasksPage() {
   const fetchTasks = async () => {
     try {
       setLoadingTasks(true)
-      const response = await fetch('/api/tasks/list')
+      const response = await fetch('/api/tasks/list-with-steps')
       if (!response.ok) {
         throw new Error('Failed to fetch tasks')
       }
       const data = await response.json()
-      const tasksWithSLA = data.map((task: Task) => calculateSLAStatus(task))
+      console.log('Fetched tasks with steps (detailed):', data.slice(0, 2).map(t => ({
+        id: t.id,
+        title: t.title,
+        category: t.category,
+        sub_category: t.sub_category,
+        workflow_id: t.workflow_id,
+        totalSteps: t.totalSteps,
+        completedSteps: t.completedSteps
+      })))
+      
+      // Check specific tasks with workflow_id
+      const workflowTasks = data.filter((t: any) => t.workflow_id)
+      console.log('Tasks with workflow_id count:', workflowTasks.length)
+      if (workflowTasks.length === 0) {
+        console.log('No tasks have workflow_id set. This means workflow attachment during task creation is not working.')
+      }
+      
+      const tasksWithSLA = data.map((task: any) => calculateSLAStatus(task))
       setTasks(tasksWithSLA)
     } catch (error) {
       console.error('Error fetching tasks:', error)
@@ -113,10 +134,14 @@ export default function AdminTasksPage() {
 
   const fetchCategories = async () => {
     try {
-      // Get categories from localStorage (set by configuration page)
-      const storedCategories = localStorage.getItem('taskCategories')
-      if (storedCategories) {
-        const data: Array<{value: string; label: string; subcategories?: string[]}> = JSON.parse(storedCategories)
+      const response = await fetch('/api/categories/list')
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+      
+      const data: Array<{value: string; label: string; subcategories?: string[]}> = await response.json()
+      
+      if (data && data.length > 0) {
         setGrievanceTypes(data.map((cat) => ({ value: cat.value, label: cat.label })))
         
         // Build subcategories mapping
@@ -126,10 +151,11 @@ export default function AdminTasksPage() {
         })
         setSubCategories(subCatMapping)
       }
-      // If no stored categories, keep the default ones already set
+      // If no categories from API, keep the default ones already set
     } catch (error) {
       console.error('Error fetching categories:', error)
-      // Keep default categories if localStorage fails
+      toast.error('Failed to load categories, using defaults')
+      // Keep default categories if API fails
     }
   }
 
@@ -214,7 +240,7 @@ export default function AdminTasksPage() {
       }
 
       const requestData = {
-        title: `Manual Entry: ${grievanceTypes.find(t => t.value === formData.grievance_type)?.label} - ${formData.voter_name}`,
+        title: `${getSourceLabel(formData.source)}: ${grievanceTypes.find(t => t.value === formData.grievance_type)?.label} - ${formData.voter_name}`,
         description: formData.description,
         status: 'open',
         priority: formData.priority,
@@ -222,7 +248,8 @@ export default function AdminTasksPage() {
         sub_category: formData.sub_category === 'none' ? undefined : formData.sub_category,
         voter_name: formData.voter_name,
         assigned_to: formData.assigned_to === 'unassigned' ? undefined : formData.assigned_to,
-        deadline: formData.deadline || undefined
+        deadline: formData.deadline || undefined,
+        source: formData.source
       }
       
       console.log('Creating task with data:', requestData)
@@ -255,7 +282,8 @@ export default function AdminTasksPage() {
         description: '',
         priority: 'medium',
         assigned_to: 'unassigned',
-        deadline: ''
+        deadline: '',
+        source: 'manual_entry'
       })
       setShowForm(false)
       
@@ -458,7 +486,7 @@ export default function AdminTasksPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="priority">Priority</Label>
                       <Select
@@ -479,6 +507,29 @@ export default function AdminTasksPage() {
                           <SelectItem value="high">
                             <Badge variant="destructive">High</Badge>
                           </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="source">Source</Label>
+                      <Select
+                        value={formData.source}
+                        onValueChange={(value) => handleInputChange('source', value)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(sourceConfig).map(([key, config]) => (
+                            <SelectItem key={key} value={key}>
+                              <div className="flex items-center gap-2">
+                                {getSourceIcon(key as any, 'h-4 w-4')}
+                                <span>{config.label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -679,6 +730,7 @@ export default function AdminTasksPage() {
                   <Table className="w-full relative">
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-8 text-xs">Src</TableHead>
                         <TableHead className="w-12 text-xs">ID</TableHead>
                         <TableHead className="text-xs">Title</TableHead>
                         <TableHead className="w-24 text-xs">Category</TableHead>
@@ -696,7 +748,18 @@ export default function AdminTasksPage() {
                     <TableBody>
                       {paginatedTasks.map((task) => (
                         <TableRow key={task.id} className="group relative hover:bg-muted/50">
-                          <TableCell className="font-mono text-xs">{task.id}</TableCell>
+                          <TableCell className="text-center">
+                            {getSourceIcon(task.source, 'h-4 w-4')}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <Button
+                              variant="link"
+                              className="h-auto p-0 text-xs font-mono"
+                              onClick={() => router.push(`/admin/tasks/${task.id}`)}
+                            >
+                              #{task.id}
+                            </Button>
+                          </TableCell>
                           <TableCell className="text-sm">
                             <div className="line-clamp-2" title={task.title}>
                               {task.title}
@@ -889,18 +952,50 @@ export default function AdminTasksPage() {
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             <div className="flex items-center gap-1">
-                              <div className="w-12 bg-muted rounded-full h-1.5">
-                                <div 
-                                  className="bg-primary h-1.5 rounded-full transition-all"
-                                  style={{ width: `${task.progress}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground">{task.progress}%</span>
+                              {(() => {
+                                // Debug logging for this specific task
+                                console.log(`Task ${task.id} debug:`, {
+                                  workflow_id: task.workflow_id,
+                                  totalSteps: task.totalSteps,
+                                  completedSteps: task.completedSteps,
+                                  hasSteps: task.totalSteps > 0
+                                })
+                                
+                                // Show step counts if there are steps, regardless of workflow_id
+                                if (task.totalSteps > 0) {
+                                  return (
+                                    <>
+                                      <IconChecklist className="h-3 w-3 text-blue-600" title="Has workflow steps" />
+                                      <span className="text-xs font-medium">
+                                        {task.completedSteps || 0}/{task.totalSteps}
+                                      </span>
+                                    </>
+                                  )
+                                } else if (task.workflow_id) {
+                                  return (
+                                    <>
+                                      <IconChecklist className="h-3 w-3 text-orange-600" title="Has workflow (no steps)" />
+                                      <span className="text-xs text-muted-foreground">0/0</span>
+                                    </>
+                                  )
+                                } else {
+                                  return (
+                                    <span className="text-xs text-muted-foreground">{task.progress}%</span>
+                                  )
+                                }
+                              })()}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-xs text-muted-foreground" title={new Date(task.created_at).toLocaleString()}>
-                              {new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            <div className="flex items-center gap-1">
+                              <div className="text-xs text-muted-foreground" title={new Date(task.created_at).toLocaleString()}>
+                                {new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                              {task.workflow_id && (
+                                <Badge variant="outline" className="text-xs h-5 px-1">
+                                  <IconChecklist className="h-3 w-3" />
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-background px-2">
@@ -1063,9 +1158,61 @@ function EditTaskForm({
     progress: task.progress,
     assigned_to: task.assigned_to || 'unassigned',
     deadline: task.deadline || '',
-    ai_summary: task.ai_summary || ''
+    ai_summary: task.ai_summary || '',
+    source: task.source || 'manual_entry'
   })
   const [saving, setSaving] = useState(false)
+  const [workflowSteps, setWorkflowSteps] = useState<any[]>([])
+  const [loadingSteps, setLoadingSteps] = useState(true)
+  
+  // Fetch workflow steps for the task
+  const fetchWorkflowSteps = async () => {
+    try {
+      setLoadingSteps(true)
+      const response = await fetch(`/api/tasks/${task.id}/steps`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch workflow steps')
+      }
+      const steps = await response.json()
+      setWorkflowSteps(steps)
+    } catch (error) {
+      console.error('Error fetching workflow steps:', error)
+    } finally {
+      setLoadingSteps(false)
+    }
+  }
+  
+  // Update workflow step status
+  const updateStepStatus = async (stepId: string, status: string, notes?: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/steps`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          stepId,
+          status,
+          notes,
+          completed_by: 'admin' // You might want to get the actual user
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to update step')
+      }
+      
+      await fetchWorkflowSteps()
+      toast.success('Step updated successfully')
+    } catch (error) {
+      console.error('Error updating step:', error)
+      toast.error('Failed to update step')
+    }
+  }
+  
+  useEffect(() => {
+    fetchWorkflowSteps()
+  }, [task.id])
 
   const handleSave = async () => {
     setSaving(true)
@@ -1191,7 +1338,30 @@ function EditTaskForm({
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Assignment & Deadline</h3>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-source">Source</Label>
+            <Select 
+              value={editData.source} 
+              onValueChange={(value) => handleInputChange('source', value)}
+              disabled={saving}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(sourceConfig).map(([key, config]) => (
+                  <SelectItem key={key} value={key}>
+                    <div className="flex items-center gap-2">
+                      {getSourceIcon(key as any, 'h-4 w-4')}
+                      <span>{config.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="edit-assigned-to">Assigned To</Label>
             <Select 
@@ -1290,35 +1460,154 @@ function EditTaskForm({
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Progress Tracking</h3>
-        
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="edit-progress">Progress</Label>
-            <div className="flex items-center gap-2">
-              <div className="w-20 bg-muted rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all"
-                  style={{ width: `${editData.progress}%` }}
-                />
-              </div>
-              <span className="text-sm font-medium">{editData.progress}%</span>
+      {/* Workflow Steps */}
+      {workflowSteps.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium flex items-center gap-2">
+            <IconChecklist className="h-5 w-5" />
+            Workflow Steps
+          </h3>
+          
+          {loadingSteps ? (
+            <div className="flex items-center justify-center py-4">
+              <IconLoader className="h-5 w-5 animate-spin mr-2" />
+              <span className="text-sm text-muted-foreground">Loading workflow steps...</span>
             </div>
-          </div>
-          <input
-            id="edit-progress"
-            type="range"
-            min="0"
-            max="100"
-            value={editData.progress}
-            onChange={(e) => handleInputChange('progress', parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            disabled={saving}
-          />
+          ) : (
+            <div className="space-y-2">
+              {workflowSteps.map((step) => (
+                <div 
+                  key={step.id} 
+                  className={`border rounded-lg p-4 transition-colors ${
+                    step.status === 'completed' ? 'bg-green-50 border-green-200' : 
+                    step.status === 'in_progress' ? 'bg-blue-50 border-blue-200' : 
+                    'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="mt-0.5">
+                        {step.status === 'completed' ? (
+                          <IconCircleCheck className="h-5 w-5 text-green-600" />
+                        ) : step.status === 'in_progress' ? (
+                          <div className="relative">
+                            <IconCircle className="h-5 w-5 text-blue-600" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="h-2 w-2 bg-blue-600 rounded-full animate-pulse" />
+                            </div>
+                          </div>
+                        ) : (
+                          <IconCircle className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">Step {step.step_number}: {step.title}</h4>
+                          {step.required && (
+                            <Badge variant="outline" className="text-xs">Required</Badge>
+                          )}
+                        </div>
+                        {step.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
+                        )}
+                        {step.duration > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <IconClock className="inline h-3 w-3 mr-1" />
+                            Expected duration: {step.duration} hour{step.duration !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                        {step.completed_at && (
+                          <p className="text-xs text-green-600 mt-1">
+                            Completed on {new Date(step.completed_at).toLocaleDateString()} by {step.completed_by}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={step.status}
+                        onValueChange={(value) => updateStepStatus(step.id, value)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger className="w-32 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="skipped">Skipped</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {step.notes && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        <IconNotes className="inline h-3 w-3 mr-1" />
+                        {step.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* Progress Summary */}
+              <div className="mt-4 p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Overall Progress</span>
+                  <span className="text-sm font-medium">
+                    {workflowSteps.filter(s => s.status === 'completed').length} of {workflowSteps.length} steps completed
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ 
+                      width: `${(workflowSteps.filter(s => s.status === 'completed').length / workflowSteps.length) * 100}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Progress - Only show for tasks without workflow steps */}
+      {workflowSteps.length === 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Progress Tracking</h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-progress">Manual Progress</Label>
+              <div className="flex items-center gap-2">
+                <div className="w-20 bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${editData.progress}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium">{editData.progress}%</span>
+              </div>
+            </div>
+            <input
+              id="edit-progress"
+              type="range"
+              min="0"
+              max="100"
+              value={editData.progress}
+              onChange={(e) => handleInputChange('progress', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              disabled={saving}
+            />
+            <p className="text-xs text-muted-foreground">
+              Set progress manually for tasks without workflow steps
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       <div className="space-y-4">

@@ -32,12 +32,16 @@ interface WorkflowStep {
 
 interface Workflow {
   id: string
-  category: string
+  category_id: string
   subcategory: string
   sla_days: number
   sla_hours: number
   warning_threshold: number
-  steps: WorkflowStep[]
+  steps?: WorkflowStep[]
+  category?: {
+    value: string
+    label: string
+  }
   created_at: string
 }
 
@@ -82,53 +86,13 @@ export default function TasksConfigurationPage() {
     try {
       setLoading(true)
       
-      // For demo purposes, load from localStorage or use defaults
-      const storedCategories = localStorage.getItem('taskCategories')
-      if (storedCategories) {
-        const data = JSON.parse(storedCategories)
-        setCategories(data)
-      } else {
-        // Load default categories
-        const defaultCategories = [
-          {
-            id: 'general',
-            value: 'general',
-            label: 'General Complaint',
-            subcategories: ['Information Request', 'Complaint', 'Suggestion', 'Feedback'],
-            created_at: '2024-01-01T00:00:00Z'
-          },
-          {
-            id: 'water',
-            value: 'water',
-            label: 'Water Supply',
-            subcategories: ['Pipe Leak', 'No Water Supply', 'Poor Water Quality', 'Billing Issues'],
-            created_at: '2024-01-01T00:00:00Z'
-          },
-          {
-            id: 'electricity',
-            value: 'electricity',
-            label: 'Electricity',
-            subcategories: ['Power Outage', 'Street Light', 'Meter Issues', 'High Bills'],
-            created_at: '2024-01-01T00:00:00Z'
-          },
-          {
-            id: 'roads',
-            value: 'roads',
-            label: 'Roads & Infrastructure',
-            subcategories: ['Potholes', 'Road Construction', 'Traffic Issues', 'Signage'],
-            created_at: '2024-01-01T00:00:00Z'
-          },
-          {
-            id: 'sanitation',
-            value: 'sanitation',
-            label: 'Sanitation',
-            subcategories: ['Garbage Collection', 'Drain Cleaning', 'Public Toilets', 'Pest Control'],
-            created_at: '2024-01-01T00:00:00Z'
-          }
-        ]
-        setCategories(defaultCategories)
-        localStorage.setItem('taskCategories', JSON.stringify(defaultCategories))
+      const response = await fetch('/api/categories/list')
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories')
       }
+      
+      const data = await response.json()
+      setCategories(data)
     } catch (error) {
       console.error('Error fetching categories:', error)
       toast.error('Failed to load categories')
@@ -157,37 +121,41 @@ export default function TasksConfigurationPage() {
         return
       }
 
-      const categoryData = {
-        id: formData.value,
+      const requestData = {
         value: formData.value,
         label: formData.label,
-        subcategories: subcategoriesArray,
-        created_at: editingCategory?.created_at || new Date().toISOString()
+        subcategories: subcategoriesArray
       }
-
-      // Get existing categories from localStorage
-      const storedCategories = localStorage.getItem('taskCategories')
-      let categories = storedCategories ? JSON.parse(storedCategories) : []
 
       if (editingCategory) {
         // Update existing category
-        const index = categories.findIndex((cat: Category) => cat.id === editingCategory.id)
-        if (index !== -1) {
-          categories[index] = categoryData
+        const response = await fetch(`/api/categories/update?id=${editingCategory.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to update category')
         }
       } else {
-        // Check if category with this value already exists
-        const existingIndex = categories.findIndex((cat: Category) => cat.value === formData.value)
-        if (existingIndex !== -1) {
-          toast.error('A category with this value already exists')
-          return
-        }
-        // Add new category
-        categories.push(categoryData)
-      }
+        // Create new category
+        const response = await fetch('/api/categories/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+        })
 
-      // Save to localStorage
-      localStorage.setItem('taskCategories', JSON.stringify(categories))
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create category')
+        }
+      }
 
       toast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully')
       setDialogOpen(false)
@@ -195,7 +163,7 @@ export default function TasksConfigurationPage() {
       fetchCategories()
     } catch (error) {
       console.error('Error saving category:', error)
-      toast.error('Failed to save category')
+      toast.error(error instanceof Error ? error.message : 'Failed to save category')
     }
   }
 
@@ -215,21 +183,20 @@ export default function TasksConfigurationPage() {
     }
 
     try {
-      // Get existing categories from localStorage
-      const storedCategories = localStorage.getItem('taskCategories')
-      let categories = storedCategories ? JSON.parse(storedCategories) : []
+      const response = await fetch(`/api/categories/delete?id=${category.id}`, {
+        method: 'DELETE'
+      })
 
-      // Remove the category
-      categories = categories.filter((cat: Category) => cat.id !== category.id)
-
-      // Save back to localStorage
-      localStorage.setItem('taskCategories', JSON.stringify(categories))
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete category')
+      }
 
       toast.success('Category deleted successfully')
       fetchCategories()
     } catch (error) {
       console.error('Error deleting category:', error)
-      toast.error('Failed to delete category')
+      toast.error(error instanceof Error ? error.message : 'Failed to delete category')
     }
   }
 
@@ -291,30 +258,47 @@ export default function TasksConfigurationPage() {
         return
       }
 
-      const newWorkflow: Workflow = {
-        id: Date.now().toString(),
-        category: workflowFormData.category,
-        subcategory: workflowFormData.subcategory || 'all',
-        sla_days: parseInt(workflowFormData.sla_days),
-        sla_hours: parseInt(workflowFormData.sla_hours) || 0,
-        warning_threshold: parseInt(workflowFormData.warning_threshold),
-        steps: workflowSteps,
-        created_at: new Date().toISOString()
+      // Find the category ID
+      const selectedCategory = categories.find(cat => cat.value === workflowFormData.category)
+      if (!selectedCategory) {
+        toast.error('Selected category not found')
+        return
       }
 
-      // Save to localStorage for demo
-      const storedWorkflows = localStorage.getItem('taskWorkflows')
-      const existingWorkflows = storedWorkflows ? JSON.parse(storedWorkflows) : []
-      existingWorkflows.push(newWorkflow)
-      localStorage.setItem('taskWorkflows', JSON.stringify(existingWorkflows))
+      const requestData = {
+        category_id: selectedCategory.id,
+        subcategory: workflowFormData.subcategory || 'all',
+        sla_days: workflowFormData.sla_days,
+        sla_hours: workflowFormData.sla_hours || '0',
+        warning_threshold: workflowFormData.warning_threshold,
+        steps: workflowSteps.map(step => ({
+          title: step.title,
+          description: step.description,
+          duration: step.duration,
+          required: step.required
+        }))
+      }
 
-      setWorkflows(existingWorkflows)
+      const response = await fetch('/api/workflows/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create workflow')
+      }
+
       setWorkflowDialogOpen(false)
       resetWorkflowForm()
+      loadWorkflows()
       toast.success('Workflow created successfully')
     } catch (error) {
       console.error('Error creating workflow:', error)
-      toast.error('Failed to create workflow')
+      toast.error(error instanceof Error ? error.message : 'Failed to create workflow')
     }
   }
 
@@ -338,14 +322,18 @@ export default function TasksConfigurationPage() {
     setAvailableSubcategories([])
   }
 
-  const loadWorkflows = () => {
+  const loadWorkflows = async () => {
     try {
-      const storedWorkflows = localStorage.getItem('taskWorkflows')
-      if (storedWorkflows) {
-        setWorkflows(JSON.parse(storedWorkflows))
+      const response = await fetch('/api/workflows/list')
+      if (!response.ok) {
+        throw new Error('Failed to fetch workflows')
       }
+      
+      const data = await response.json()
+      setWorkflows(data)
     } catch (error) {
       console.error('Error loading workflows:', error)
+      toast.error('Failed to load workflows')
     }
   }
 
@@ -734,22 +722,25 @@ export default function TasksConfigurationPage() {
                       {workflows.map((workflow) => (
                         <TableRow key={workflow.id}>
                           <TableCell className="font-medium">
-                            {categories.find(cat => cat.value === workflow.category)?.label || workflow.category}
+                            {workflow.category?.label || categories.find(cat => cat.id === workflow.category_id)?.label || workflow.category_id}
                           </TableCell>
                           <TableCell>
                             {workflow.subcategory === 'all' ? 'All' : workflow.subcategory}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {workflow.steps.slice(0, 2).map((step, index) => (
+                              {workflow.steps && workflow.steps.slice(0, 2).map((step, index) => (
                                 <span key={index} className="text-xs bg-muted px-2 py-1 rounded">
                                   {step.title}
                                 </span>
                               ))}
-                              {workflow.steps.length > 2 && (
+                              {workflow.steps && workflow.steps.length > 2 && (
                                 <span className="text-xs text-muted-foreground">
                                   +{workflow.steps.length - 2} more
                                 </span>
+                              )}
+                              {(!workflow.steps || workflow.steps.length === 0) && (
+                                <span className="text-xs text-muted-foreground">No steps</span>
                               )}
                             </div>
                           </TableCell>

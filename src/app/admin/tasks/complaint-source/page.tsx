@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { IconPlus, IconEdit, IconTrash, IconPhone, IconMail, IconBrandWhatsapp, IconMessage, IconQrcode } from '@tabler/icons-react'
 
-export default function ComplaintSourcePage() {
+export default function TaskSourcePage() {
   const sources = [
     {
       id: 1,
@@ -61,9 +61,9 @@ export default function ComplaintSourcePage() {
       <div className="@container/main flex flex-1 flex-col gap-6 p-4 md:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Complaint Sources</h1>
+            <h1 className="text-3xl font-bold">Task Sources</h1>
             <p className="text-muted-foreground">
-              Manage channels through which complaints are received
+              Manage channels through which tasks are received
             </p>
           </div>
           <Button className="gap-2">
@@ -88,7 +88,7 @@ export default function ComplaintSourcePage() {
                 <CardContent>
                   <h3 className="font-semibold text-sm">{source.name}</h3>
                   <p className="text-2xl font-bold mt-1">{source.tasksReceived}</p>
-                  <p className="text-xs text-muted-foreground">Total complaints</p>
+                  <p className="text-xs text-muted-foreground">Total tasks</p>
                 </CardContent>
               </Card>
             )
@@ -99,7 +99,7 @@ export default function ComplaintSourcePage() {
           <CardHeader>
             <CardTitle>Source Configuration</CardTitle>
             <CardDescription>
-              Configure and manage complaint intake channels
+              Configure and manage task intake channels
             </CardDescription>
           </CardHeader>
           <CardContent>

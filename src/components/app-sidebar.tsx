@@ -66,7 +66,7 @@ const data = {
           url: "/admin/tasks/configuration",
         },
         {
-          title: "Complaint Source",
+          title: "Task Source",
           url: "/admin/tasks/complaint-source",
         },
       ],

@@ -1,4 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,14 +25,36 @@ export default async function handler(
       })
     }
 
-    // In a real application, you would:
-    // 1. Check if any tasks are using this category
-    // 2. Either prevent deletion or reassign tasks to another category
-    // 3. Delete from database
-    
-    console.log('Deleting category:', id)
+    // Check if any tasks are using this category
+    const { data: tasks, error: tasksError } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('category', id)
+      .limit(1)
 
-    // For demo purposes, we'll just return success
+    if (tasksError) {
+      console.error('Error checking tasks:', tasksError)
+      return res.status(500).json({ error: 'Failed to check category usage' })
+    }
+
+    if (tasks && tasks.length > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete category that is being used by existing tasks'
+      })
+    }
+
+    // Delete from Supabase
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting category:', error)
+      return res.status(500).json({ error: 'Failed to delete category' })
+    }
+    
+    console.log('Deleted category:', id)
     res.status(200).json({ 
       message: 'Category deleted successfully',
       id: id 
