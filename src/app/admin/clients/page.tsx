@@ -16,6 +16,7 @@ import {
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Politician } from '@/lib/database-types'
+import { TableLoader } from '@/components/page-loader'
 
 export default function ClientsPage() {
   const router = useRouter()
@@ -47,6 +48,12 @@ export default function ClientsPage() {
       })
 
       if (!response.ok) {
+        // Don't show error for authentication issues
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch politicians')
+          setPoliticians([])
+          return
+        }
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || 'Failed to fetch politicians')
       }
@@ -266,20 +273,16 @@ export default function ClientsPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <IconLoader className="h-6 w-6 animate-spin mr-2" />
-                <span>Loading clients...</span>
-              </div>
-            ) : filteredPoliticians.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  {politicians.length === 0 
-                    ? "No clients onboarded yet. Click 'Onboard New Client' to get started."
-                    : "No clients match your search criteria."}
-                </p>
-              </div>
-            ) : (
+            <TableLoader loading={loading} loadingText="Loading clients..." rows={5}>
+              {filteredPoliticians.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    {politicians.length === 0 
+                      ? "No clients onboarded yet. Click 'Onboard New Client' to get started."
+                      : "No clients match your search criteria."}
+                  </p>
+                </div>
+              ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -395,7 +398,8 @@ export default function ClientsPage() {
                   </TableBody>
                 </Table>
               </div>
-            )}
+              )}
+            </TableLoader>
           </CardContent>
         </Card>
       </div>

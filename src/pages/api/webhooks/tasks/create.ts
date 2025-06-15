@@ -67,7 +67,8 @@ export default async function handler(
       source,
       webhook_source,
       external_id,
-      webhook_metadata
+      webhook_metadata,
+      politician_id // Allow webhook to specify politician_id
     } = req.body
 
     console.log('Extracted webhook data:', {
@@ -110,6 +111,16 @@ export default async function handler(
       taskDeadline = deadlineDate.toISOString()
     }
 
+    // Validate politician_id if provided
+    if (!politician_id) {
+      console.log('Webhook missing politician_id')
+      return res.status(400).json({
+        error: 'Missing required field: politician_id',
+        message: 'Webhook must specify which politician this task belongs to',
+        timestamp: new Date().toISOString()
+      })
+    }
+
     // Create the task data with webhook metadata
     const taskData = {
       title: webhook_source ? `[${webhook_source}] ${title}` : title,
@@ -124,6 +135,7 @@ export default async function handler(
       is_deleted: false,
       ai_summary: description,
       source: source || 'email', // Default to email for webhook unless specified
+      politician_id: politician_id, // Set politician_id for multi-tenant isolation
       // Store webhook metadata in ai_summary or create separate field
       ...(webhook_metadata && {
         ai_summary: `${description}\n\nWebhook Metadata: ${JSON.stringify(webhook_metadata)}`
@@ -149,12 +161,13 @@ export default async function handler(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
     
-    // First get the category ID
-    console.log('Looking for category with value:', grievance_type)
+    // First get the category ID for this politician
+    console.log('Looking for category with value:', grievance_type, 'for politician:', politician_id)
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .select('id')
       .eq('value', grievance_type)
+      .eq('politician_id', politician_id)
       .single()
     
     if (categoryError) {

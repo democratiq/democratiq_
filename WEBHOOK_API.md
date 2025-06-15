@@ -30,7 +30,8 @@ WEBHOOK_API_KEY=your-very-secure-api-key-here
   "title": "Task title",
   "description": "Detailed description of the task",
   "grievance_type": "category", // Must match your category values
-  "voter_name": "Name of person submitting"
+  "voter_name": "Name of person submitting",
+  "politician_id": "politician-uuid-here" // Required: ID of the politician this task belongs to
 }
 ```
 

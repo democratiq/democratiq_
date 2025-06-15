@@ -1,5 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { staffService } from '@/lib/supabase-admin'
+import { createClient } from '@supabase/supabase-js'
+import { getAuthContext, applyPoliticianFilter } from '@/lib/api-auth-helpers'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,6 +18,13 @@ export default async function handler(
   }
 
   try {
+    // Get auth context
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
     const { id } = req.query
     
     if (!id || typeof id !== 'string') {
@@ -23,6 +36,7 @@ export default async function handler(
       email,
       phone,
       role,
+      department,
       location,
       is_active
     } = req.body
@@ -34,32 +48,59 @@ export default async function handler(
       })
     }
 
-    // Get current staff data
-    const currentStaff = await staffService.getById(id)
-    
+    // First verify the staff member exists and user has access
+    let verifyQuery = supabase
+      .from('staff')
+      .select('id, politician_id')
+      .eq('id', id)
+
+    // Apply politician filter if user is not super admin
+    verifyQuery = applyPoliticianFilter(verifyQuery, authContext)
+
+    const { data: existingStaff, error: verifyError } = await verifyQuery.single()
+
+    if (verifyError || !existingStaff) {
+      console.error('Staff not found or access denied:', verifyError)
+      return res.status(404).json({ error: 'Staff member not found or access denied' })
+    }
+
     // Prepare update data (only include provided fields)
-    const updateData: any = {}
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    }
     if (name !== undefined) updateData.name = name
     if (email !== undefined) updateData.email = email
     if (phone !== undefined) updateData.phone = phone
     if (role !== undefined) updateData.role = role
+    if (department !== undefined) updateData.department = department
     if (location !== undefined) updateData.location = location
     if (is_active !== undefined) updateData.is_active = is_active
 
-    const updatedStaff = await staffService.update(id, updateData)
+    // Update the staff member
+    let updateQuery = supabase
+      .from('staff')
+      .update(updateData)
+      .eq('id', id)
+
+    // Apply politician filter if user is not super admin
+    updateQuery = applyPoliticianFilter(updateQuery, authContext)
+
+    const { data: updatedStaff, error } = await updateQuery
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating staff member:', error)
+      return res.status(500).json({ error: 'Failed to update staff member' })
+    }
 
     res.status(200).json(updatedStaff)
 
   } catch (error) {
     console.error('Error updating staff member:', error)
-    
-    if (error instanceof Error && error.message.includes('not found')) {
-      res.status(404).json({ error: 'Staff member not found' })
-    } else {
-      res.status(500).json({
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
   }
 }

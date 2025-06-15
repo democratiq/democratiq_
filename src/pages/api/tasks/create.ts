@@ -17,6 +17,16 @@ export default async function handler(
       return
     }
 
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    console.log('Auth context:', authContext)
+
     console.log('Importing taskService...')
     const { taskService } = await import('../../../lib/supabase-admin')
     console.log('taskService imported successfully')
@@ -64,7 +74,7 @@ export default async function handler(
       taskDeadline = deadlineDate.toISOString()
     }
 
-    // Create the task data
+    // Create the task data with politician_id
     const taskData = {
       title,
       category: grievance_type,
@@ -77,7 +87,8 @@ export default async function handler(
       deadline: taskDeadline,
       is_deleted: false,
       ai_summary: description,
-      source
+      source,
+      politician_id: authContext.politicianId // Add politician_id for multi-tenant isolation
     }
 
     console.log('Task data prepared:', taskData)
@@ -95,13 +106,19 @@ export default async function handler(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
     
-    // First get the category ID
-    console.log('Looking for category with value:', grievance_type)
-    const { data: category, error: categoryError } = await supabase
+    // First get the category ID for this politician
+    console.log('Looking for category with value:', grievance_type, 'for politician:', authContext.politicianId)
+    let categoryQuery = supabase
       .from('categories')
       .select('id')
       .eq('value', grievance_type)
-      .single()
+    
+    // Filter by politician_id if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      categoryQuery = categoryQuery.eq('politician_id', authContext.politicianId)
+    }
+    
+    const { data: category, error: categoryError } = await categoryQuery.single()
     
     if (categoryError) {
       console.error('Error fetching category:', categoryError)
@@ -117,7 +134,7 @@ export default async function handler(
       
       // If subcategory is provided and not 'none', look for specific workflow
       if (sub_category && sub_category !== 'none') {
-        const result = await supabase
+        let workflowQuery = supabase
           .from('workflows')
           .select(`
             id,
@@ -127,7 +144,13 @@ export default async function handler(
           `)
           .eq('category_id', category.id)
           .eq('subcategory', sub_category)
-          .maybeSingle()
+        
+        // Filter by politician_id if user is not super admin
+        if (authContext.role !== 'super_admin' && authContext.politicianId) {
+          workflowQuery = workflowQuery.eq('politician_id', authContext.politicianId)
+        }
+        
+        const result = await workflowQuery.maybeSingle()
         
         workflow = result.data
         workflowError = result.error
@@ -140,7 +163,7 @@ export default async function handler(
       // If no specific workflow found, try 'all' subcategories
       if (!workflow) {
         console.log('No specific workflow found, trying for all subcategories')
-        const { data: allWorkflow, error: allWorkflowError } = await supabase
+        let allWorkflowQuery = supabase
           .from('workflows')
           .select(`
             id,
@@ -150,7 +173,13 @@ export default async function handler(
           `)
           .eq('category_id', category.id)
           .eq('subcategory', 'all')
-          .maybeSingle()
+        
+        // Filter by politician_id if user is not super admin
+        if (authContext.role !== 'super_admin' && authContext.politicianId) {
+          allWorkflowQuery = allWorkflowQuery.eq('politician_id', authContext.politicianId)
+        }
+        
+        const { data: allWorkflow, error: allWorkflowError } = await allWorkflowQuery.maybeSingle()
         
         if (allWorkflowError) {
           console.error('Error fetching all workflow:', allWorkflowError)

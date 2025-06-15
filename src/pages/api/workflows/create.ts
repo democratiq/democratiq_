@@ -14,6 +14,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    // Ensure user has a politician_id (not super admin creating without context)
+    if (!authContext.politicianId && authContext.role !== 'super_admin') {
+      return res.status(403).json({ error: 'No politician context found' })
+    }
+
     const { category_id, subcategory, sla_days, sla_hours, warning_threshold, steps } = req.body
 
     // Validate required fields
@@ -40,7 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         subcategory: subcategory || 'all',
         sla_days: parseInt(sla_days),
         sla_hours: parseInt(sla_hours) || 0,
-        warning_threshold: parseInt(warning_threshold) || 80
+        warning_threshold: parseInt(warning_threshold) || 80,
+        politician_id: authContext.politicianId // Set politician_id for multi-tenant isolation
       })
       .select()
       .single()

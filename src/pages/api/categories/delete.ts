@@ -17,6 +17,14 @@ export default async function handler(
   }
 
   try {
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
     const { id } = req.query
 
     if (!id) {
@@ -25,12 +33,18 @@ export default async function handler(
       })
     }
 
-    // Check if any tasks are using this category
-    const { data: tasks, error: tasksError } = await supabase
+    // Check if any tasks are using this category (within the user's politician scope)
+    let tasksQuery = supabase
       .from('tasks')
       .select('id')
       .eq('category', id)
-      .limit(1)
+
+    // Apply politician filter if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      tasksQuery = tasksQuery.eq('politician_id', authContext.politicianId)
+    }
+
+    const { data: tasks, error: tasksError } = await tasksQuery.limit(1)
 
     if (tasksError) {
       console.error('Error checking tasks:', tasksError)
@@ -43,11 +57,18 @@ export default async function handler(
       })
     }
 
-    // Delete from Supabase
-    const { error } = await supabase
+    // Delete from Supabase with politician_id filter for security
+    let deleteQuery = supabase
       .from('categories')
       .delete()
       .eq('id', id)
+
+    // Apply politician filter if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      deleteQuery = deleteQuery.eq('politician_id', authContext.politicianId)
+    }
+
+    const { error } = await deleteQuery
 
     if (error) {
       console.error('Error deleting category:', error)

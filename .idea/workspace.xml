@@ -6,11 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="14d6c508-ccdb-4ced-9b47-476c634d9099" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/app-sidebar.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/database-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/database-types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/super-admin-guard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/super-admin-guard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/pages/api/auth/verify-role.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/pages/api/auth/verify-role.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -72,7 +69,7 @@
       <option name="presentableId" value="Default" />
       <updated>1749570340610</updated>
       <workItem from="1749570342071" duration="43328000" />
-      <workItem from="1749843599431" duration="15140000" />
+      <workItem from="1749843599431" duration="16332000" />
     </task>
     <servers />
   </component>

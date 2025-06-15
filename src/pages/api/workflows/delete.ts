@@ -14,6 +14,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
     const { id } = req.query
 
     if (!id) {
@@ -22,12 +30,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    // Check if any tasks are using this workflow
-    const { data: tasks, error: tasksError } = await supabase
+    // Check if any tasks are using this workflow (within the user's politician scope)
+    let tasksQuery = supabase
       .from('tasks')
       .select('id')
       .eq('workflow_id', id)
-      .limit(1)
+
+    // Apply politician filter if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      tasksQuery = tasksQuery.eq('politician_id', authContext.politicianId)
+    }
+
+    const { data: tasks, error: tasksError } = await tasksQuery.limit(1)
 
     if (tasksError) {
       console.error('Error checking tasks:', tasksError)
@@ -40,11 +54,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    // Delete workflow (steps will be cascade deleted)
-    const { error } = await supabase
+    // Delete workflow with politician_id filter for security (steps will be cascade deleted)
+    let deleteQuery = supabase
       .from('workflows')
       .delete()
       .eq('id', id)
+
+    // Apply politician filter if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      deleteQuery = deleteQuery.eq('politician_id', authContext.politicianId)
+    }
+
+    const { error } = await deleteQuery
 
     if (error) {
       console.error('Error deleting workflow:', error)

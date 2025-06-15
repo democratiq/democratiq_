@@ -17,6 +17,15 @@ export default async function handler(
       return
     }
 
+    // Check if service role key exists
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables')
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        details: 'Service role key not configured' 
+      })
+    }
+
     // Get auth token
     const authHeader = req.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {

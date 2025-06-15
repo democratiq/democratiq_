@@ -21,12 +21,15 @@ import {
   IconAdjustments,
   IconMessageReport,
   IconBuilding,
+  IconCalendarPlus,
+  IconPlus,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -91,6 +94,21 @@ const data = {
       title: "Staff",
       url: "/admin/staff",
       icon: IconUsers,
+      items: [
+        {
+          title: "Staff Management",
+          url: "/admin/staff",
+        },
+        {
+          title: "Analytics",
+          url: "/admin/staff/analytics",
+        },
+      ],
+    },
+    {
+      title: "Settings",
+      url: "/admin/settings",
+      icon: IconSettings,
     },
   ],
   navClouds: [
@@ -196,6 +214,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {/* Create Event Button */}
+        <div className="px-3 py-2">
+          <Button asChild className="w-full gap-2">
+            <a href="/admin/events/create">
+              <IconCalendarPlus className="h-4 w-4" />
+              Create Event
+            </a>
+          </Button>
+        </div>
         <NavMain items={data.navMain} />
         <NavDocuments items={data.documents} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />

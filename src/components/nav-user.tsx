@@ -8,6 +8,7 @@ import {
   IconLogout,
   IconNotification,
   IconUserCircle,
+  IconPalette,
 } from "@tabler/icons-react"
 
 import {
@@ -22,6 +23,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -30,6 +34,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { ThemeToggleCompact } from "@/components/theme-toggle"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
@@ -113,6 +118,15 @@ export function NavUser() {
                 <IconNotification />
                 Notifications
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <IconPalette />
+                  Theme
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <ThemeToggleCompact />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

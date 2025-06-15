@@ -1,5 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { taskService } from '@/lib/supabase-admin'
+import { createClient } from '@supabase/supabase-js'
+import { getAuthContext, applyPoliticianFilter } from '@/lib/api-auth-helpers'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,6 +18,13 @@ export default async function handler(
   }
 
   try {
+    // Get auth context to determine politician_id
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
     const { id } = req.query
     const updates = req.body
 
@@ -31,9 +44,44 @@ export default async function handler(
       return res.status(400).json({ error: 'No updates provided' })
     }
 
-    console.log('Calling taskService.update with:', taskId, updates)
-    const updatedTask = await taskService.update(taskId, updates)
+    // First verify the task exists and user has access to it
+    let verifyQuery = supabase
+      .from('tasks')
+      .select('id, politician_id')
+      .eq('id', taskId)
 
+    // Apply politician filter if user is not super admin
+    verifyQuery = applyPoliticianFilter(verifyQuery, authContext)
+
+    const { data: existingTask, error: verifyError } = await verifyQuery.single()
+
+    if (verifyError || !existingTask) {
+      console.error('Task not found or access denied:', verifyError)
+      return res.status(404).json({ error: 'Task not found or access denied' })
+    }
+
+    // Update the task with politician_id filtering for security
+    let updateQuery = supabase
+      .from('tasks')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskId)
+
+    // Apply politician filter if user is not super admin
+    updateQuery = applyPoliticianFilter(updateQuery, authContext)
+
+    const { data: updatedTask, error } = await updateQuery
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating task:', error)
+      return res.status(500).json({ error: 'Failed to update task' })
+    }
+
+    console.log('Task updated successfully:', updatedTask)
     res.status(200).json(updatedTask)
 
   } catch (error) {

@@ -30,7 +30,9 @@ export function SuperAdminGuard({ children }: SuperAdminGuardProps) {
             router.push('/login')
             return
           }
-          throw new Error('Failed to verify role')
+          const errorData = await response.json()
+          console.error('Role verification failed:', errorData)
+          throw new Error(errorData.details || errorData.error || 'Failed to verify role')
         }
         
         const result = await response.json()

@@ -17,6 +17,14 @@ export default async function handler(
   }
 
   try {
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
     const { id } = req.query
     const { value, label, subcategories } = req.body
 
@@ -40,8 +48,8 @@ export default async function handler(
       })
     }
 
-    // Update in Supabase
-    const { data: updatedCategory, error } = await supabase
+    // Update in Supabase with politician_id filter for security
+    let updateQuery = supabase
       .from('categories')
       .update({
         value,
@@ -49,6 +57,13 @@ export default async function handler(
         subcategories: subcategories || []
       })
       .eq('id', id)
+
+    // Apply politician filter if user is not super admin
+    if (authContext.role !== 'super_admin' && authContext.politicianId) {
+      updateQuery = updateQuery.eq('politician_id', authContext.politicianId)
+    }
+
+    const { data: updatedCategory, error } = await updateQuery
       .select()
       .single()
 

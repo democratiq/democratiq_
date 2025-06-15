@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { IconSettings, IconClock, IconBell, IconMail, IconPlus, IconEdit, IconTrash, IconTag, IconList } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { PageLoader } from '@/components/page-loader'
 
 interface Category {
   id: string
@@ -86,12 +87,26 @@ export default function TasksConfigurationPage() {
     try {
       setLoading(true)
       
-      const response = await fetch('/api/categories/list')
+      // Get auth headers properly
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+      
+      const response = await fetch('/api/categories/list', {
+        headers: authHeaders
+      })
+      
+      // Don't show error for authentication issues
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch categories')
+          setCategories([])
+          return
+        }
         throw new Error('Failed to fetch categories')
       }
       
       const data = await response.json()
+      console.log('Fetched categories:', data) // Debug log
       setCategories(data)
     } catch (error) {
       console.error('Error fetching categories:', error)
@@ -127,11 +142,16 @@ export default function TasksConfigurationPage() {
         subcategories: subcategoriesArray
       }
 
+      // Get auth headers
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+
       if (editingCategory) {
         // Update existing category
         const response = await fetch(`/api/categories/update?id=${editingCategory.id}`, {
           method: 'PUT',
           headers: {
+            ...authHeaders,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(requestData)
@@ -146,6 +166,7 @@ export default function TasksConfigurationPage() {
         const response = await fetch('/api/categories/create', {
           method: 'POST',
           headers: {
+            ...authHeaders,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(requestData)
@@ -183,8 +204,13 @@ export default function TasksConfigurationPage() {
     }
 
     try {
+      // Get auth headers
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+
       const response = await fetch(`/api/categories/delete?id=${category.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders
       })
 
       if (!response.ok) {
@@ -279,9 +305,14 @@ export default function TasksConfigurationPage() {
         }))
       }
 
+      // Get auth headers
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+
       const response = await fetch('/api/workflows/create', {
         method: 'POST',
         headers: {
+          ...authHeaders,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestData)
@@ -324,12 +355,26 @@ export default function TasksConfigurationPage() {
 
   const loadWorkflows = async () => {
     try {
-      const response = await fetch('/api/workflows/list')
+      // Get auth headers properly
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+      
+      const response = await fetch('/api/workflows/list', {
+        headers: authHeaders
+      })
+      
+      // Don't show error for authentication issues
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch workflows')
+          setWorkflows([])
+          return
+        }
         throw new Error('Failed to fetch workflows')
       }
       
       const data = await response.json()
+      console.log('Fetched workflows:', data) // Debug log
       setWorkflows(data)
     } catch (error) {
       console.error('Error loading workflows:', error)
@@ -352,7 +397,8 @@ export default function TasksConfigurationPage() {
           </p>
         </div>
 
-        <div className="grid gap-6">
+        <PageLoader loading={loading} loadingText="Loading configuration...">
+          <div className="grid gap-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -908,7 +954,8 @@ export default function TasksConfigurationPage() {
             <Button variant="outline">Cancel</Button>
             <Button>Save Configuration</Button>
           </div>
-        </div>
+          </div>
+        </PageLoader>
       </div>
     </AuthGuard>
   )

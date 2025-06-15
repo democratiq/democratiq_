@@ -17,6 +17,19 @@ export default async function handler(
   }
 
   try {
+    // Get auth context to determine politician_id
+    const { getAuthContext } = await import('../../../lib/api-auth-helpers')
+    const authContext = await getAuthContext(req)
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    // Ensure user has a politician_id (not super admin creating without context)
+    if (!authContext.politicianId && authContext.role !== 'super_admin') {
+      return res.status(403).json({ error: 'No politician context found' })
+    }
+
     console.log('Create category request body:', req.body)
     const { value, label, subcategories } = req.body
 
@@ -35,13 +48,14 @@ export default async function handler(
       })
     }
 
-    // Insert into Supabase
+    // Insert into Supabase with politician_id
     const { data: newCategory, error } = await supabase
       .from('categories')
       .insert({
         value,
         label,
-        subcategories: subcategories || []
+        subcategories: subcategories || [],
+        politician_id: authContext.politicianId // Set politician_id for multi-tenant isolation
       })
       .select()
       .single()

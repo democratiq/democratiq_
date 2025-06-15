@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { Task, TaskWithSLA } from '@/lib/database-types'
 import { calculateSLAStatus, getSLABadgeVariant, getSLAText } from '@/lib/sla-utils'
 import { getSourceIcon, getSourceLabel, sourceConfig } from '@/lib/source-utils'
+import { PageLoader, TableLoader } from '@/components/page-loader'
 
 export default function AdminTasksPage() {
   const router = useRouter()
@@ -83,10 +84,19 @@ export default function AdminTasksPage() {
   const fetchTasks = async () => {
     try {
       setLoadingTasks(true)
-      const response = await fetch('/api/tasks/list-with-steps')
+      const { fetchWithAuth } = await import('@/lib/fetch-with-auth')
+      const response = await fetchWithAuth('/api/tasks/list-with-steps')
+      
+      // Don't show error for authentication issues
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch tasks')
+          setTasks([])
+          return
+        }
         throw new Error('Failed to fetch tasks')
       }
+      
       const data = await response.json()
       console.log('Fetched tasks with steps (detailed):', data.slice(0, 2).map(t => ({
         id: t.id,
@@ -134,8 +144,16 @@ export default function AdminTasksPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/categories/list')
+      const { fetchWithAuth } = await import('@/lib/fetch-with-auth')
+      const response = await fetchWithAuth('/api/categories/list')
+      
+      // Don't show error for authentication issues
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch categories, using defaults')
+          // Keep default categories without showing error
+          return
+        }
         throw new Error('Failed to fetch categories')
       }
       
@@ -169,9 +187,14 @@ export default function AdminTasksPage() {
     try {
       console.log('Updating task:', taskId, 'with updates:', updates)
       
+      // Get auth headers
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+      
       const response = await fetch(`/api/tasks/update?id=${taskId}`, {
         method: 'PUT',
         headers: {
+          ...authHeaders,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(updates)
@@ -254,9 +277,14 @@ export default function AdminTasksPage() {
       
       console.log('Creating task with data:', requestData)
 
+      // Get auth headers
+      const { getAuthHeaders } = await import('@/lib/client-auth')
+      const authHeaders = await getAuthHeaders()
+
       const response = await fetch('/api/tasks/create', {
         method: 'POST',
         headers: {
+          ...authHeaders,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestData)
@@ -712,21 +740,17 @@ export default function AdminTasksPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {loadingTasks ? (
-                <div className="flex items-center justify-center py-8">
-                  <IconLoader className="h-6 w-6 animate-spin mr-2" />
-                  <span>Loading tasks...</span>
-                </div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    {tasks.length === 0 
-                      ? "No tasks found. Create your first task using the button above."
-                      : "No tasks match your current filters. Try adjusting or clearing filters."}
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full overflow-x-auto">
+              <TableLoader loading={loadingTasks} loadingText="Loading tasks..." rows={8}>
+                {filteredTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      {tasks.length === 0 
+                        ? "No tasks found. Create your first task using the button above."
+                        : "No tasks match your current filters. Try adjusting or clearing filters."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="w-full overflow-x-auto">
                   <Table className="w-full relative">
                     <TableHeader>
                       <TableRow>
@@ -1126,6 +1150,7 @@ export default function AdminTasksPage() {
                   </div>
                 </div>
               )}
+              </TableLoader>
           </CardContent>
         </Card>
       </div>
