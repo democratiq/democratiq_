@@ -128,12 +128,23 @@ export default function AdminTasksPage() {
   const fetchStaff = async () => {
     try {
       setLoadingStaff(true)
-      const response = await fetch('/api/staff/list')
+      const { fetchWithAuth } = await import('@/lib/fetch-with-auth')
+      const response = await fetchWithAuth('/api/staff/list')
+      
+      // Don't show error for authentication issues
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.log('User not authorized to fetch staff')
+          setStaff([])
+          return
+        }
         throw new Error('Failed to fetch staff')
       }
+      
       const data = await response.json()
-      setStaff(data)
+      // Handle both array response and paginated response
+      const staffArray = Array.isArray(data) ? data : data.staff || []
+      setStaff(staffArray)
     } catch (error) {
       console.error('Error fetching staff:', error)
       toast.error('Failed to load staff')
