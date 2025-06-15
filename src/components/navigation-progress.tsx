@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { IconLoader2 } from '@tabler/icons-react'
 
-export function NavigationProgress() {
+function NavigationProgressComponent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
@@ -91,5 +91,13 @@ export function NavigationProgress() {
         </div>
       )}
     </>
+  )
+}
+
+export function NavigationProgress() {
+  return (
+    <Suspense fallback={null}>
+      <NavigationProgressComponent />
+    </Suspense>
   )
 }

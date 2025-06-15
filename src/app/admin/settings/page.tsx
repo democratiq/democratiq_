@@ -101,36 +101,41 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchCalendarStatus()
     
-    // Check for OAuth callback results in URL params
-    const urlParams = new URLSearchParams(window.location.search)
-    const success = urlParams.get('success')
-    const error = urlParams.get('error')
-    const calendars = urlParams.get('calendars')
+    // Check for OAuth callback results in URL params (client-side only)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const success = urlParams.get('success')
+      const error = urlParams.get('error')
+      const calendars = urlParams.get('calendars')
 
-    if (success === 'calendar_connected') {
-      toast.success(`Google Calendar connected successfully! ${calendars} calendars found.`)
-      // Clear URL params
-      window.history.replaceState({}, '', '/admin/settings')
-      // Refresh status
-      setTimeout(fetchCalendarStatus, 1000)
-    } else if (error) {
-      const errorMessages: Record<string, string> = {
-        oauth_denied: 'Google Calendar access was denied',
-        missing_parameters: 'Invalid OAuth response',
-        invalid_state: 'Security validation failed',
-        expired_state: 'OAuth session expired',
-        no_access_token: 'Failed to get access token',
-        database_error: 'Failed to save calendar settings',
-        callback_error: 'OAuth callback error'
+      if (success === 'calendar_connected') {
+        toast.success(`Google Calendar connected successfully! ${calendars} calendars found.`)
+        // Clear URL params
+        window.history.replaceState({}, '', '/admin/settings')
+        // Refresh status
+        setTimeout(fetchCalendarStatus, 1000)
+      } else if (error) {
+        const errorMessages: Record<string, string> = {
+          oauth_denied: 'Google Calendar access was denied',
+          missing_parameters: 'Invalid OAuth response',
+          invalid_state: 'Security validation failed',
+          expired_state: 'OAuth session expired',
+          no_access_token: 'Failed to get access token',
+          database_error: 'Failed to save calendar settings',
+          callback_error: 'OAuth callback error'
+        }
+        toast.error(errorMessages[error] || 'Failed to connect Google Calendar')
+        // Clear URL params
+        window.history.replaceState({}, '', '/admin/settings')
       }
-      toast.error(errorMessages[error] || 'Failed to connect Google Calendar')
-      // Clear URL params
-      window.history.replaceState({}, '', '/admin/settings')
     }
   }, [])
 
   const fetchCalendarStatus = async () => {
     try {
+      // Only fetch on client side
+      if (typeof window === 'undefined') return
+      
       const { getAuthHeaders } = await import('@/lib/client-auth')
       const authHeaders = await getAuthHeaders()
       
